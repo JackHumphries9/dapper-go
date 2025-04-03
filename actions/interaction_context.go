@@ -333,4 +333,16 @@ func (ic *InteractionContext) GetInteractionUser() *discord.User {
 	}
 }
 
-// TODO: Add subcommands
+func (ic *InteractionContext) HasSubCommandOption(name string) (bool, error) {
+	option, err := GetCommandOption(ic.Interaction, name)
+
+	if err != nil || option == nil {
+		return false, err
+	}
+
+	if option.Type == command_option_type.SubCommand {
+		return option.Name == name, nil
+	}
+
+	return false, fmt.Errorf("Cannot find subcommand option: %s", name)
+}

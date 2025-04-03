@@ -9,7 +9,7 @@ import (
 	"github.com/JackHumphries9/dapper-go/actions"
 	"github.com/JackHumphries9/dapper-go/client"
 	"github.com/JackHumphries9/dapper-go/discord"
-	"github.com/JackHumphries9/dapper-go/discord/button_style"
+	"github.com/JackHumphries9/dapper-go/discord/command_option_type"
 	"github.com/JackHumphries9/dapper-go/helpers"
 	"github.com/JackHumphries9/dapper-go/server"
 )
@@ -39,29 +39,49 @@ func LoadJSONEnv() Env {
 	return data
 }
 
-var button = actions.Button{
-	Button: &discord.Button{
-		Style:    button_style.Primary,
-		Label:    helpers.Ptr("Test"),
-		CustomId: helpers.Ptr("test-btn"),
+var command = actions.Command{
+	Command: client.CreateApplicationCommand{
+		Name:        "user",
+		Description: helpers.Ptr("testing"),
 	},
-	OnPress: func(itc *actions.InteractionContext) {
-		itc.SetEphemeral(true)
-		itc.Defer()
-
-		err := itc.Respond(discord.ResponseEditData{
-
-			Embeds: []discord.Embed{
-				{
-					Title:       "Pressed!",
-					Description: "You pressed the button!",
+	Actions: []actions.Action{
+		actions.Subcommand{
+			Subcommand: discord.ApplicationCommandOption{
+				Type: command_option_type.SubCommand,
+				Name: "get",
+				Options: []discord.ApplicationCommandOption{
+					{
+						Type:        command_option_type.User,
+						Name:        "user",
+						Description: "testing",
+					},
 				},
 			},
-		})
+			OnInvoke: func(itc *actions.InteractionContext) {
+				itc.SetEphemeral(true)
+				itc.Defer()
 
-		if err != nil {
-			fmt.Printf("cannot respond to message %v", err)
-		}
+				user, err := itc.GetUserCommandOption("user")
+
+				if err != nil {
+					panic("woahhh")
+				}
+
+				err = itc.Respond(discord.ResponseEditData{
+
+					Embeds: []discord.Embed{
+						{
+							Title:       "Got a user!",
+							Description: fmt.Sprintf("Got user: %s", user.MentionUserString()),
+						},
+					},
+				})
+
+				if err != nil {
+					fmt.Printf("cannot respond to message %v", err)
+				}
+			},
+		},
 	},
 }
 
@@ -76,43 +96,7 @@ func main() {
 		panic("Heyo you messed up")
 	}
 
-	botServer.RegisterAction(actions.Command{
-		Command: client.CreateApplicationCommand{
-			Name:        "fruit",
-			Description: helpers.Ptr("Ping Pong"),
-		},
-		Actions: []actions.Action{button},
-		OnInvoke: func(itc *actions.InteractionContext) {
-			itc.SetEphemeral(true)
-			itc.Defer()
-
-			fileBytes, err := os.ReadFile("./examples/testing/test-image.png")
-			if err != nil {
-				fmt.Printf("Error reading file: %v\n", err)
-				return
-			}
-
-			err = itc.Respond(discord.ResponseEditData{
-				Embeds: []discord.Embed{
-					{
-						Title:       "Hello World!",
-						Description: "Hello World!",
-						Image: &discord.EmbedImage{
-							URL: "attachment://test-image.png",
-						},
-					},
-				},
-				Components: helpers.CreateActionRow(button.Button),
-				Attachments: []discord.MessageAttachment{
-					discord.NewBytesAttachment(fileBytes, "test-image.png", "image/png"),
-				},
-			})
-
-			if err != nil {
-				fmt.Printf("cannot respond to message %v", err)
-			}
-		},
-	})
+	botServer.RegisterAction(command)
 
 	botServer.RegisterCommandsWithDiscord(appId, botClient)
 
