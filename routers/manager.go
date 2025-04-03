@@ -71,8 +71,6 @@ func (ir *InteractionRouter) bindAction(action actions.Action) {
 		panic("action already exists")
 	}
 
-	fmt.Printf("binding action %s\n", action.CustomID())
-
 	ir.actions[action.CustomID()] = action
 }
 

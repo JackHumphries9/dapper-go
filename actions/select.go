@@ -11,7 +11,7 @@ type Select struct {
 }
 
 func (s Select) CustomID() string {
-	if s.Select != nil {
+	if s.Select == nil {
 		return ""
 	}
 
