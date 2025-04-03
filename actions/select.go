@@ -30,7 +30,7 @@ func (s Select) Handler(itc *InteractionContext) {
 	s.OnSelect(itc)
 }
 
-func (s Button) Select() []Action {
+func (s Select) AssociatedActions() []Action {
 	return []Action{}
 }
 
