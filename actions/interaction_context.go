@@ -1,4 +1,4 @@
-package interactable
+package actions
 
 import (
 	"fmt"
@@ -13,9 +13,17 @@ import (
 
 type InteractionContext struct {
 	Interaction  *discord.Interaction
-	DeferChannel chan *discord.InteractionResponse
-	HasDeferred  bool
+	deferChannel chan *discord.InteractionResponse
+	hasDeferred  bool
 	messageFlags message_flags.MessageFlags
+}
+
+func NewInteractionContext(interaction *discord.Interaction, deferChannel chan *discord.InteractionResponse, cancelDefer bool) InteractionContext {
+	return InteractionContext{
+		Interaction:  interaction,
+		deferChannel: deferChannel,
+		hasDeferred:  cancelDefer,
+	}
 }
 
 func (ic *InteractionContext) SetEphemeral(ep bool) {
@@ -26,52 +34,41 @@ func (ic *InteractionContext) SetEphemeral(ep bool) {
 	}
 }
 
-func (ic *InteractionContext) GetHasDeferred() bool {
-	return ic.HasDeferred
-}
-
 func (ic *InteractionContext) GetMessageFlags() message_flags.MessageFlags {
 	return ic.messageFlags
 }
 
 func (ic *InteractionContext) Defer() {
-	if ic.HasDeferred {
+	if ic.hasDeferred {
 		fmt.Printf("Interaction already deferred")
 		return
 	}
 
-	ic.HasDeferred = true
+	ic.hasDeferred = true
+
+	response := &discord.InteractionResponse{
+		Data: &discord.MessageCallbackData{
+			Flags: helpers.Ptr(int(ic.messageFlags)),
+		},
+	}
 
 	if ic.Interaction.Type == interaction_type.ApplicationCommand {
-		ic.DeferChannel <- &discord.InteractionResponse{
-			Type: interaction_callback_type.DeferredChannelMessageWithSource,
-			Data: &discord.MessageCallbackData{
-				Flags: helpers.Ptr(int(ic.messageFlags)),
-			},
-		}
+		response.Type = interaction_callback_type.DeferredChannelMessageWithSource
 	}
 
 	if ic.Interaction.Type == interaction_type.MessageComponent {
-		ic.DeferChannel <- &discord.InteractionResponse{
-			Type: interaction_callback_type.DeferredUpdateMessage,
-			Data: &discord.MessageCallbackData{
-				Flags: helpers.Ptr(int(ic.messageFlags)),
-			},
-		}
+		response.Type = interaction_callback_type.DeferredUpdateMessage
 	}
 
 	if ic.Interaction.Type == interaction_type.ModalSubmit {
-		ic.DeferChannel <- &discord.InteractionResponse{
-			Type: interaction_callback_type.DeferredChannelMessageWithSource,
-			Data: &discord.MessageCallbackData{
-				Flags: helpers.Ptr(int(ic.messageFlags)),
-			},
-		}
+		response.Type = interaction_callback_type.DeferredChannelMessageWithSource
 	}
+
+	ic.deferChannel <- response
 }
 
 func (ic *InteractionContext) Respond(msg discord.ResponseEditData) error {
-	if ic.HasDeferred {
+	if ic.hasDeferred {
 		return ic.Interaction.EditResponse(msg)
 	}
 
@@ -93,7 +90,7 @@ func (ic *InteractionContext) Respond(msg discord.ResponseEditData) error {
 		responseType = interaction_callback_type.ChannelMessageWithSource
 	}
 
-	ic.DeferChannel <- &discord.InteractionResponse{
+	ic.deferChannel <- &discord.InteractionResponse{
 		Type: responseType,
 		Data: &discord.MessageCallbackData{
 			Content:         msg.Content,
@@ -108,11 +105,11 @@ func (ic *InteractionContext) Respond(msg discord.ResponseEditData) error {
 }
 
 func (ic *InteractionContext) ShowModal(modal Modal) error {
-	if ic.HasDeferred {
+	if ic.hasDeferred {
 		return fmt.Errorf("Cannot show modal after deferring")
 	}
 
-	ic.DeferChannel <- &discord.InteractionResponse{
+	ic.deferChannel <- &discord.InteractionResponse{
 		Type: interaction_callback_type.Modal,
 		Data: modal.Modal,
 	}
@@ -128,6 +125,8 @@ func (ic *InteractionContext) GetIdContext() *string {
 
 	return helpers.GetContextFromId(componentData.CustomId)
 }
+
+// Really, all this should be in GLaDIs
 
 func (ic *InteractionContext) GetModalTextInputValue(id string) *string {
 	if ic.Interaction.Type != interaction_type.ModalSubmit {
@@ -324,6 +323,14 @@ func (ic *InteractionContext) GetAttachmentCommandOption(name string) (*discord.
 	}
 
 	return nil, fmt.Errorf("Cannot find string option: %s", name)
+}
+
+func (ic *InteractionContext) GetInteractionUser() *discord.User {
+	if ic.Interaction.Member != nil {
+		return ic.Interaction.Member.User
+	} else {
+		return ic.Interaction.User
+	}
 }
 
 // TODO: Add subcommands

@@ -8,11 +8,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/JackHumphries9/dapper-go/actions"
 	"github.com/JackHumphries9/dapper-go/client"
 	"github.com/JackHumphries9/dapper-go/discord"
-	"github.com/JackHumphries9/dapper-go/discord/interaction_type"
-	"github.com/JackHumphries9/dapper-go/interactable"
-	"github.com/JackHumphries9/dapper-go/managers"
+
+	"github.com/JackHumphries9/dapper-go/routers"
 	"github.com/JackHumphries9/dapper-go/verification"
 )
 
@@ -26,24 +26,22 @@ var defaultConfig = InteractionServerOptions{
 }
 
 type InteractionHandler struct {
-	opts             InteractionServerOptions
-	commandManager   managers.CommandManager
-	componentManager managers.ComponentManager
-	modalManager     managers.ModalManager
-	logger           *DapperLogger
+	opts              InteractionServerOptions
+	interactionRouter routers.InteractionRouter
+	logger            *DapperLogger
 }
 
-func (is *InteractionHandler) Handle(w http.ResponseWriter, r *http.Request) {
+func (ih *InteractionHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is supported", http.StatusMethodNotAllowed)
-		is.logger.Error("Only POST method is supported")
+		ih.logger.Error("Only POST method is supported")
 		return
 	}
 
-	verify := verification.Verify(r, is.opts.PublicKey)
+	verify := verification.Verify(r, ih.opts.PublicKey)
 
 	if !verify {
-		is.logger.Error("Recieved an invalid request")
+		ih.logger.Error("Recieved an invalid request")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -52,93 +50,65 @@ func (is *InteractionHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if err != nil {
-		is.logger.Error("Failed to read body")
+		ih.logger.Error("Failed to read body")
 		return
 	}
 
 	interaction, err := discord.ParseInteraction(string(rawBody))
 
 	if err != nil {
-		is.logger.Error(fmt.Sprintf("Failed to parse interaction: %v\n", err))
+		ih.logger.Error(fmt.Sprintf("Failed to parse interaction: %v\n", err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	is.logger.OnInteractionRecieved(interaction)
+	ih.logger.OnInteractionRecieved(interaction)
 
 	if interaction.IsPing() {
 		discord.CreatePongResponse().ToHttpResponse().WriteResponse(w)
 		return
 	}
 
-	var interactionResponse discord.InteractionResponse
-
-	if interaction.Type == interaction_type.ApplicationCommand {
-		interactionResponse, err = is.commandManager.RouteInteraction(interaction)
-	} else if interaction.Type == interaction_type.MessageComponent {
-		interactionResponse, err = is.componentManager.RouteInteraction(interaction)
-	} else if interaction.Type == interaction_type.ModalSubmit {
-		interactionResponse, err = is.modalManager.RouteInteraction(interaction)
-	} else {
-		is.logger.Error(fmt.Sprintf("Unknown interaction type: %d\n", interaction.Type))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	interactionResponse, err := ih.interactionRouter.RouteInteraction(interaction)
 
 	if err != nil {
-		is.logger.Error(fmt.Sprintf("An error occured while handling the interaction: %+v", err))
-
-		w.WriteHeader(500)
+		ih.logger.Error(fmt.Sprintf("failed to route the interaction: %+v\n", err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	// TODO: Handle attachments here
 
 	body, err := json.Marshal(interactionResponse)
 	if err != nil {
-		is.logger.Error("An error occured while responding to interaction")
-		w.WriteHeader(500)
+		ih.logger.Error("An error occured while responding to interaction")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	w.Write(body)
 
 	return
 }
 
-func (is *InteractionHandler) RegisterCommand(cmd interactable.Command) {
-	is.commandManager.Register(cmd)
-
-	for _, comp := range cmd.GetComponents() {
-		is.componentManager.Register(comp, cmd.Command.Name)
-	}
-
-	for _, modal := range cmd.GetModals() {
-		is.modalManager.Register(modal, cmd.Command.Name)
-	}
+func (ih *InteractionHandler) RegisterAction(action actions.Action) {
+	ih.interactionRouter.RegisterAction(action)
 }
 
-func (is *InteractionHandler) RegisterComponent(comp interactable.Component) {
-	is.componentManager.Register(comp, "")
-}
-
-func (is *InteractionHandler) RegisterModal(modal interactable.Modal) {
-	is.modalManager.Register(modal, "")
-}
-
-func (is *InteractionHandler) RegisterCommandsWithDiscord(appId discord.Snowflake, client *client.BotClient) error {
-	err := is.commandManager.RegisterCommandsWithDiscord(appId, client)
+func (ih *InteractionHandler) RegisterCommandsWithDiscord(appId discord.Snowflake, client *client.BotClient) error {
+	err := ih.interactionRouter.RegisterCommandsWithDiscord(appId, client)
 
 	if err != nil {
-		is.logger.Error(fmt.Sprintf("Failed to register discord commands: %v\n", err))
+		ih.logger.Error(fmt.Sprintf("Failed to register discord commands: %v\n", err))
 	} else {
-		is.logger.Info("Successfully registered discord commands")
+		ih.logger.Info("Successfully registered discord commands")
 	}
 
 	return err
 }
-
-func NewInteractionServer(publicKey string) InteractionHandler {
+func NewInteractionHandler(publicKey string) InteractionHandler {
 	key, err := hex.DecodeString(publicKey)
 
 	if err != nil {
@@ -157,10 +127,8 @@ func NewInteractionHandlerWithOptions(iso InteractionServerOptions) InteractionH
 	}
 
 	return InteractionHandler{
-		opts:             iso,
-		commandManager:   managers.NewDapperCommandManager(),
-		componentManager: managers.NewDapperComponentManager(),
-		modalManager:     managers.NewDapperModalManager(),
-		logger:           iso.DapperLogger,
+		opts:              iso,
+		interactionRouter: routers.NewInteractionRouter(),
+		logger:            iso.DapperLogger,
 	}
 }

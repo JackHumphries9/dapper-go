@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/JackHumphries9/dapper-go/actions"
 	"github.com/JackHumphries9/dapper-go/client"
 	"github.com/JackHumphries9/dapper-go/discord"
+	"github.com/JackHumphries9/dapper-go/discord/button_style"
 	"github.com/JackHumphries9/dapper-go/helpers"
-	"github.com/JackHumphries9/dapper-go/interactable"
 	"github.com/JackHumphries9/dapper-go/server"
 )
 
@@ -38,10 +39,36 @@ func LoadJSONEnv() Env {
 	return data
 }
 
+var button = actions.Button{
+	Button: &discord.Button{
+		Style:    button_style.Primary,
+		Label:    helpers.Ptr("Test"),
+		CustomId: helpers.Ptr("test-btn"),
+	},
+	OnPress: func(itc *actions.InteractionContext) {
+		itc.SetEphemeral(true)
+		itc.Defer()
+
+		err := itc.Respond(discord.ResponseEditData{
+
+			Embeds: []discord.Embed{
+				{
+					Title:       "Pressed!",
+					Description: "You pressed the button!",
+				},
+			},
+		})
+
+		if err != nil {
+			fmt.Printf("cannot respond to message %v", err)
+		}
+	},
+}
+
 func main() {
 	var env = LoadJSONEnv()
 
-	botServer := server.NewInteractionServer(env.PublicKey)
+	botServer := server.NewInteractionHandler(env.PublicKey)
 	botClient := client.NewBot(env.BotToken)
 	appId, err := discord.GetSnowflake(env.AppId)
 
@@ -49,13 +76,14 @@ func main() {
 		panic("Heyo you messed up")
 	}
 
-	botServer.RegisterCommand(interactable.Command{
+	botServer.RegisterAction(actions.Command{
 		Command: client.CreateApplicationCommand{
 			Name:        "fruit",
 			Description: helpers.Ptr("Ping Pong"),
 		},
-		OnCommand: func(itc *interactable.InteractionContext) {
-			itc.SetEphemeral(false)
+		Actions: []actions.Action{button},
+		OnInvoke: func(itc *actions.InteractionContext) {
+			itc.SetEphemeral(true)
 			itc.Defer()
 
 			fileBytes, err := os.ReadFile("./examples/testing/test-image.png")
@@ -74,6 +102,7 @@ func main() {
 						},
 					},
 				},
+				Components: helpers.CreateActionRow(button.Button),
 				Attachments: []discord.MessageAttachment{
 					discord.NewBytesAttachment(fileBytes, "test-image.png", "image/png"),
 				},
