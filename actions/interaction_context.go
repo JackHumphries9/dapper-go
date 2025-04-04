@@ -178,7 +178,7 @@ func GetCommandOption(itx *discord.Interaction, name string) (*discord.Applicati
 func (ic *InteractionContext) GetStringCommandOption(name string) (*string, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil {
+	if err != nil || option == nil {
 		return nil, err
 	}
 
@@ -192,7 +192,7 @@ func (ic *InteractionContext) GetStringCommandOption(name string) (*string, erro
 func (ic *InteractionContext) GetBoolCommandOption(name string) (*bool, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil {
+	if err != nil || option == nil {
 		return nil, err
 	}
 
@@ -206,7 +206,7 @@ func (ic *InteractionContext) GetBoolCommandOption(name string) (*bool, error) {
 func (ic *InteractionContext) GetNumberCommandOption(name string) (*float64, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil {
+	if err != nil || option == nil {
 		return nil, err
 	}
 
@@ -220,7 +220,7 @@ func (ic *InteractionContext) GetNumberCommandOption(name string) (*float64, err
 func (ic *InteractionContext) GetIntCommandOption(name string) (*int64, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil {
+	if err != nil || option == nil {
 		return nil, err
 	}
 
@@ -234,7 +234,7 @@ func (ic *InteractionContext) GetIntCommandOption(name string) (*int64, error) {
 func (ic *InteractionContext) GetUserCommandOption(name string) (*discord.Snowflake, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil {
+	if err != nil || option == nil {
 		return nil, err
 	}
 
@@ -248,13 +248,13 @@ func (ic *InteractionContext) GetUserCommandOption(name string) (*discord.Snowfl
 		return &val, nil
 	}
 
-	return nil, fmt.Errorf("Cannot find string option: %s", name)
+	return nil, fmt.Errorf("Cannot find user option: %s", name)
 }
 
 func (ic *InteractionContext) GetRoleCommandOption(name string) (*discord.Snowflake, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil {
+	if err != nil || option == nil {
 		return nil, err
 	}
 
@@ -268,7 +268,7 @@ func (ic *InteractionContext) GetRoleCommandOption(name string) (*discord.Snowfl
 		return &val, nil
 	}
 
-	return nil, fmt.Errorf("Cannot find string option: %s", name)
+	return nil, fmt.Errorf("Cannot find role option: %s", name)
 }
 
 func (ic *InteractionContext) GetMentionableCommandOption(name string) (*discord.Snowflake, error) {
@@ -276,6 +276,10 @@ func (ic *InteractionContext) GetMentionableCommandOption(name string) (*discord
 
 	if err != nil {
 		return nil, err
+	}
+
+	if option == nil {
+		return nil, fmt.Errorf("couldn't get option")
 	}
 
 	if option.Type == command_option_type.Mentionable {
@@ -288,7 +292,7 @@ func (ic *InteractionContext) GetMentionableCommandOption(name string) (*discord
 		return &val, nil
 	}
 
-	return nil, fmt.Errorf("Cannot find string option: %s", name)
+	return nil, fmt.Errorf("Cannot find mentionable option: %s", name)
 }
 
 func (ic *InteractionContext) GetChannelCommandOption(name string) (*discord.Snowflake, error) {
@@ -296,6 +300,10 @@ func (ic *InteractionContext) GetChannelCommandOption(name string) (*discord.Sno
 
 	if err != nil {
 		return nil, err
+	}
+
+	if option == nil {
+		return nil, fmt.Errorf("couldn't get option")
 	}
 
 	if option.Type == command_option_type.Channel {
@@ -308,7 +316,7 @@ func (ic *InteractionContext) GetChannelCommandOption(name string) (*discord.Sno
 		return &val, nil
 	}
 
-	return nil, fmt.Errorf("Cannot find string option: %s", name)
+	return nil, fmt.Errorf("Cannot find channel option: %s", name)
 }
 
 func (ic *InteractionContext) GetAttachmentCommandOption(name string) (*discord.Attachment, error) {
@@ -318,11 +326,15 @@ func (ic *InteractionContext) GetAttachmentCommandOption(name string) (*discord.
 		return nil, err
 	}
 
-	if option.Type == command_option_type.Mentionable {
+	if option == nil {
+		return nil, fmt.Errorf("couldn't get option")
+	}
+
+	if option.Type == command_option_type.Attachment {
 		return helpers.Ptr(option.Value.(discord.Attachment)), nil
 	}
 
-	return nil, fmt.Errorf("Cannot find string option: %s", name)
+	return nil, fmt.Errorf("Cannot find attachment option: %s", name)
 }
 
 func (ic *InteractionContext) GetInteractionUser() *discord.User {
@@ -336,8 +348,12 @@ func (ic *InteractionContext) GetInteractionUser() *discord.User {
 func (ic *InteractionContext) HasSubCommandOption(name string) (bool, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
-	if err != nil || option == nil {
+	if err != nil {
 		return false, err
+	}
+
+	if option == nil {
+		return false, fmt.Errorf("couldn't get option")
 	}
 
 	if option.Type == command_option_type.SubCommand {
