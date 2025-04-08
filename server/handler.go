@@ -119,7 +119,7 @@ func NewInteractionHandler(publicKey string) InteractionHandler {
 	return NewInteractionHandlerWithOptions(InteractionServerOptions{
 		PublicKey:      ed25519.PublicKey(key),
 		DapperLogger:   &DefaultLogger,
-		StateDelimiter: "/",
+		StateDelimiter: ":",
 	})
 }
 
