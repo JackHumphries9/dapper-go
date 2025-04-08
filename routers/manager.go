@@ -2,6 +2,7 @@ package routers
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/JackHumphries9/dapper-go/actions"
 	"github.com/JackHumphries9/dapper-go/client"
@@ -12,12 +13,14 @@ import (
 )
 
 type InteractionRouter struct {
-	actions map[string]actions.Action
+	actions        map[string]actions.Action
+	stateDelimiter string
 }
 
-func NewInteractionRouter() InteractionRouter {
+func NewInteractionRouter(stateDelimiter string) InteractionRouter {
 	return InteractionRouter{
-		actions: make(map[string]actions.Action, 0),
+		actions:        make(map[string]actions.Action, 0),
+		stateDelimiter: stateDelimiter,
 	}
 }
 
@@ -36,6 +39,8 @@ func (ir *InteractionRouter) RouteInteraction(interaction *discord.Interaction) 
 	} else {
 		return discord.InteractionResponse{}, fmt.Errorf("invalid interaction type")
 	}
+
+	interactionCustomId = strings.Split(interactionCustomId, ir.stateDelimiter)[0]
 
 	// Find associated action
 	if action, ok := ir.actions[interactionCustomId]; ok {

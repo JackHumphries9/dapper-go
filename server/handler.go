@@ -17,8 +17,9 @@ import (
 )
 
 type InteractionServerOptions struct {
-	PublicKey    ed25519.PublicKey
-	DapperLogger *DapperLogger
+	PublicKey      ed25519.PublicKey
+	DapperLogger   *DapperLogger
+	StateDelimiter string
 }
 
 var defaultConfig = InteractionServerOptions{
@@ -116,8 +117,9 @@ func NewInteractionHandler(publicKey string) InteractionHandler {
 	}
 
 	return NewInteractionHandlerWithOptions(InteractionServerOptions{
-		PublicKey:    ed25519.PublicKey(key),
-		DapperLogger: &DefaultLogger,
+		PublicKey:      ed25519.PublicKey(key),
+		DapperLogger:   &DefaultLogger,
+		StateDelimiter: "/",
 	})
 }
 
@@ -128,7 +130,7 @@ func NewInteractionHandlerWithOptions(iso InteractionServerOptions) InteractionH
 
 	return InteractionHandler{
 		opts:              iso,
-		interactionRouter: routers.NewInteractionRouter(),
+		interactionRouter: routers.NewInteractionRouter(iso.StateDelimiter),
 		logger:            iso.DapperLogger,
 	}
 }
