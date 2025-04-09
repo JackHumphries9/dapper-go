@@ -82,7 +82,6 @@ func (data *ResponseEditData) ParseAttachments() {
 }
 
 func (data *ResponseEditData) BuildHTTPRequest(ctx context.Context, method string, url string) (*http.Request, error) {
-
 	err := data.Verify()
 	if err != nil {
 		return nil, fmt.Errorf("error verifying edit data: %w", err)

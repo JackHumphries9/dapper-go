@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/JackHumphries9/dapper-go/client/errors"
 	"github.com/JackHumphries9/dapper-go/discord"
 	"github.com/JackHumphries9/dapper-go/discord/channel_type"
 )
@@ -64,24 +65,32 @@ func (channelClient *ChannelClient) EditMessage(messageId discord.Snowflake, edi
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify response edit data validity: %w", err)
 	}
+
+	request, err := editData.BuildHTTPRequest(nil, "PATCH", DiscordApiURL+fmt.Sprintf("/channels/%d/messages/%d", channelClient.ChannelId, messageId))
+
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %w", err)
+	}
+
+	response, err := channelClient.Bot.Client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("error sending HTTP request: %w", err)
+	}
+
+	if response.StatusCode == 200 {
+		return nil, errors.StatusError{
+			Code:     errors.StatusErrorCode(response.StatusCode),
+			Response: response,
+		}
+	}
+
 	returnedMessage := &discord.Message{}
-	data, err := json.Marshal(editData)
+
+	err = json.NewDecoder(response.Body).Decode(returnedMessage)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling response edit data to JSON: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
-	req := DiscordRequest{
-		Method:         "PATCH",
-		Endpoint:       fmt.Sprintf("/messages/%d", messageId),
-		Body:           data,
-		ExpectedStatus: 200,
-		UnmarshalTo:    returnedMessage,
-	}
-
-	_, err = channelClient.MakeRequest(req)
-	if err != nil {
-		return nil, err
-	}
 	return returnedMessage, nil
 }
 
