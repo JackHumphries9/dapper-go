@@ -72,12 +72,14 @@ func (channelClient *ChannelClient) EditMessage(messageId discord.Snowflake, edi
 		return nil, fmt.Errorf("error building request: %w", err)
 	}
 
+	request.Header.Set("Authorization", "Bot "+channelClient.Bot.Token)
+
 	response, err := channelClient.Bot.Client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("error sending HTTP request: %w", err)
 	}
 
-	if response.StatusCode == 200 {
+	if response.StatusCode != 200 {
 		return nil, errors.StatusError{
 			Code:     errors.StatusErrorCode(response.StatusCode),
 			Response: response,
