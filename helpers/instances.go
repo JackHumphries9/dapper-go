@@ -14,7 +14,7 @@ type ButtonInstanceOptions struct {
 }
 
 func CreateButtonInstance(button *discord.Button, opts ButtonInstanceOptions) discord.MessageComponent {
-	buttonInstance := button
+	buttonInstance := *button
 
 	if opts.Disabled != nil {
 		buttonInstance.Disabled = opts.Disabled
@@ -33,5 +33,5 @@ func CreateButtonInstance(button *discord.Button, opts ButtonInstanceOptions) di
 		buttonInstance.CustomId = opts.CustomID
 	}
 
-	return buttonInstance
+	return &buttonInstance
 }
