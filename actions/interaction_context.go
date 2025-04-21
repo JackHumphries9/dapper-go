@@ -231,6 +231,8 @@ func (ic *InteractionContext) GetIntCommandOption(name string) (*int64, error) {
 	return nil, fmt.Errorf("Cannot find string option: %s", name)
 }
 
+// TODO: Change these to include resolved data rather than just snowflakes
+
 func (ic *InteractionContext) GetUserCommandOption(name string) (*discord.Snowflake, error) {
 	option, err := GetCommandOption(ic.Interaction, name)
 
@@ -330,11 +332,27 @@ func (ic *InteractionContext) GetAttachmentCommandOption(name string) (*discord.
 		return nil, fmt.Errorf("couldn't get option")
 	}
 
-	if option.Type == command_option_type.Attachment {
-		return helpers.Ptr(option.Value.(discord.Attachment)), nil
+	if option.Type != command_option_type.Attachment {
+		return nil, fmt.Errorf("option %s is not of type attachment", name)
 	}
 
-	return nil, fmt.Errorf("Cannot find attachment option: %s", name)
+	id, ok := option.Value.(string)
+
+	if !ok {
+		return nil, fmt.Errorf("cannot cast value to string")
+	}
+
+	commandData := ic.Interaction.Data.(*discord.ApplicationCommandData)
+
+	if commandData.Resolved == nil || commandData.Resolved.Attachments == nil {
+		return nil, fmt.Errorf("cannot find resolution data")
+	}
+
+	if attachment, ok := (*commandData.Resolved.Attachments)[id]; ok {
+		return attachment, nil
+	}
+
+	return nil, fmt.Errorf("failed to get attachment")
 }
 
 func (ic *InteractionContext) GetInteractionUser() *discord.User {
