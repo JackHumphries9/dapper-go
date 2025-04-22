@@ -2,6 +2,7 @@ package actions
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/JackHumphries9/dapper-go/discord"
 	"github.com/JackHumphries9/dapper-go/discord/command_option_type"
@@ -379,4 +380,34 @@ func (ic *InteractionContext) HasSubCommandOption(name string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("Cannot find subcommand option: %s", name)
+}
+
+// Entitlement checks here
+
+func (ic *InteractionContext) IsEntitledToGuildSKU(skuId discord.Snowflake) bool {
+	for _, e := range ic.Interaction.Entitlements {
+		if e.SkuID != skuId {
+			continue
+		}
+
+		if e.GuildID == nil || ic.Interaction.GuildId == nil {
+			continue
+		}
+
+		if *e.GuildID != *ic.Interaction.GuildId {
+			continue
+		}
+
+		if e.Deleted {
+			continue
+		}
+
+		if e.EndsAt != nil && time.Now().After(*e.EndsAt) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
 }
